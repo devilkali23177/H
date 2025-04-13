@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Body Management System</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #f0f4f8;
+      --text: #000;
+      --card: #fff;
+      --accent: #007BFF;
+      --danger: #dc3545;
+    }
+    [data-theme="dark"] {
+      --bg: #121212;
+      --text: #f0f0f0;
+      --card: #1f1f1f;
+      --accent: #3399ff;
+      --danger: #ff4d4d;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: var(--bg);
+      color: var(--text);
+    }
+    h1, h2, h3 { color: var(--text); }
+    .tracker {
+      background: var(--card);
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
+    label { display: block; margin: 10px 0 5px; }
+    input, select {
+      width: 100%; padding: 8px; margin-bottom: 10px;
+      background: var(--bg); color: var(--text);
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 10px 15px; background: var(--accent); color: white;
+      border: none; border-radius: 4px; cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    .log { font-size: 0.9em; color: #555; }
+    canvas { margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #eee; }
+  </style>
+</head>
+<body>
+
+<h1>Physical Body Management System <button onclick="toggleTheme()" style="float:right">Toggle Theme</button></h1>
+
+<div class="tracker">
+  <h2>Import/Export & Reset</h2>
+  <button onclick="exportData()">Export Data (JSON)</button>
+  <input type="file" id="importFile" accept=".json" onchange="importData(event)" />
+  <button onclick="resetAllData()" style="background-color: var(--danger);">Reset All Data</button>
+</div>
+
+<div class="tracker">
+  <h2>Predefined Categories</h2>
+  <select id="categorySelect">
+    <option value="weight">Weight</option>
+    <option value="sleep">Sleep</option>
+    <option value="water">Water</option>
+    <option value="exercise">Exercise</option>
+  </select>
+  <input type="number" id="valueInput" placeholder="Enter value" />
+  <button onclick="logData()">Log Entry</button>
+</div>
+
+<div class="tracker">
+  <h2>Add Custom Category</h2>
+  <input type="text" id="customCategoryName" placeholder="Custom Category Name" />
+  <button onclick="addCustomCategory()">Add Custom Category</button>
+  <div id="customCategoryContainer"></div>
+</div>
+
+<div class="tracker">
+  <h2>Data Table</h2>
+  <label for="filterSelect">Filter by Category:</label>
+  <select id="filterSelect" onchange="renderTable()">
+    <option value="all">All</option>
+    <option value="weight">Weight</option>
+    <option value="sleep">Sleep</option>
+    <option value="water">Water</option>
+    <option value="exercise">Exercise</option>
+  </select>
+  <button onclick="resetTableData()" style="background-color: var(--danger);">Reset Table Data</button>
+  <div id="dataTableContainer"></div>
+</div>
+
+<div id="chartContainer"></div>
+
+<script>
+  const defaultCategories = ['weight', 'sleep', 'water', 'exercise'];
+  let allCategories = [...defaultCategories];
+
+  function logData(category = null) {
+    const selectedCategory = category || document.getElementById('categorySelect').value;
+    const inputValue = category ? document.getElementById(`input-${category}`).value : document.getElementById('valueInput').value;
+    if (!inputValue) return;
+    const data = JSON.parse(localStorage.getItem(selectedCategory + 'Data') || '[]');
+    const date = new Date().toLocaleString();
+    data.push({ date, value: parseFloat(inputValue) });
+    localStorage.setItem(selectedCategory + 'Data', JSON.stringify(data));
+    if (!allCategories.includes(selectedCategory)) {
+      allCategories.push(selectedCategory);
+      updateFilterOptions();
+    }
+    renderChart(selectedCategory);
+    renderTable();
+    if (!category) document.getElementById('valueInput').value = '';
+    else document.getElementById(`input-${category}`).value = '';
+  }
+
+  function addCustomCategory() {
+    const name = document.getElementById('customCategoryName').value.trim().toLowerCase();
+    if (!name || allCategories.includes(name)) return;
+    allCategories.push(name);
+    updateFilterOptions();
+    const container = document.getElementById('customCategoryContainer');
+    const section = document.createElement('div');
+    section.innerHTML = `
+      <h3>${name.charAt(0).toUpperCase() + name.slice(1)}</h3>
+      <input type="number" id="input-${name}" placeholder="Enter ${name} value" />
+      <button onclick="logData('${name}')">Log ${name}</button>
+      <canvas id="chart-${name}" width="400" height="200"></canvas>
+    `;
+    container.appendChild(section);
+  }
+
+  function updateFilterOptions() {
+    const filter = document.getElementById('filterSelect');
+    filter.innerHTML = '<option value="all">All</option>';
+    allCategories.forEach(c => {
+      filter.innerHTML += `<option value="${c}">${c.charAt(0).toUpperCase() + c.slice(1)}</option>`;
+    });
+  }
+
+  function renderChart(type) {
+    const canvasId = `chart-${type}`;
+    let canvas = document.getElementById(canvasId);
+    if (!canvas) {
+      const chartDiv = document.createElement('div');
+      chartDiv.innerHTML = `<canvas id="${canvasId}" width="400" height="200"></canvas>`;
+      document.getElementById('chartContainer').appendChild(chartDiv);
+      canvas = document.getElementById(canvasId);
+    }
+    const ctx = canvas.getContext('2d');
+    const existing = Chart.getChart(ctx);
+    if (existing) existing.destroy();
+    const data = JSON.parse(localStorage.getItem(type + 'Data') || '[]');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.map(d => d.date),
+        datasets: [{
+          label: type.charAt(0).toUpperCase() + type.slice(1),
+          data: data.map(d => d.value),
+          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: { responsive: true }
+    });
+  }
+
+  function renderTable() {
+    const filter = document.getElementById('filterSelect').value;
+    let html = '<table><tr><th>Category</th><th>Date</th><th>Value</th></tr>';
+    allCategories.forEach(cat => {
+      if (filter === 'all' || filter === cat) {
+        const data = JSON.parse(localStorage.getItem(cat + 'Data') || '[]');
+        data.forEach(entry => {
+          html += `<tr><td>${cat}</td><td>${entry.date}</td><td>${entry.value}</td></tr>`;
+        });
+      }
+    });
+    html += '</table>';
+    document.getElementById('dataTableContainer').innerHTML = html;
+  }
+
+  function resetAllData() {
+    if (confirm('Delete all data?')) {
+      allCategories.forEach(c => localStorage.removeItem(c + 'Data'));
+      location.reload();
+    }
+  }
+
+  function resetTableData() {
+    const filter = document.getElementById('filterSelect').value;
+    if (filter === 'all') return alert('Select a specific category.');
+    if (confirm(`Delete all ${filter} data?`)) {
+      localStorage.removeItem(filter + 'Data');
+      renderChart(filter);
+      renderTable();
+    }
+  }
+
+  function exportData() {
+    const allData = {};
+    allCategories.forEach(c => {
+      allData[c] = JSON.parse(localStorage.getItem(c + 'Data') || '[]');
+    });
+    const blob = new Blob([JSON.stringify(allData)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'body_data.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        const imported = JSON.parse(e.target.result);
+        Object.keys(imported).forEach(c => {
+          localStorage.setItem(c + 'Data', JSON.stringify(imported[c]));
+          if (!allCategories.includes(c)) allCategories.push(c);
+        });
+        location.reload();
+      } catch { alert('Invalid file.'); }
+    };
+    reader.readAsText(file);
+  }
+
+  function toggleTheme() {
+    const current = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', current);
+    localStorage.setItem('theme', current);
+  }
+
+  window.onload = () => {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.body.setAttribute('data-theme', savedTheme);
+    updateFilterOptions();
+    allCategories.forEach(cat => {
+      renderChart(cat);
+    });
+    renderTable();
+  };
+</script>
+
+</body>
+</html>
