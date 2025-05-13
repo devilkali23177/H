@@ -1461,7 +1461,10 @@
           updateCategoryDropdowns();
         });
         
-        // Load all data
+        // Set up real-time listeners for all data
+        setupRealtimeListeners();
+        
+        // Load all data initially
         loadJournalEntries();
         loadFinanceEntries();
         renderTasks();
@@ -1480,6 +1483,83 @@
         showView('login-view');
       }
     });
+
+    // Set up real-time listeners for all data
+    function setupRealtimeListeners() {
+      // Journal entries
+      journalRef.on('value', () => {
+        loadJournalEntries();
+        updateDashboard();
+        if (document.getElementById('analytics-tab').classList.contains('active')) {
+          updateAnalyticsCharts();
+        }
+      });
+      
+      // Finance entries
+      financeRef.on('value', () => {
+        loadFinanceEntries();
+        updateDashboard();
+        if (document.getElementById('analytics-tab').classList.contains('active')) {
+          updateAnalyticsCharts();
+        }
+      });
+      
+      // Tasks
+      tasksRef.on('value', () => {
+        renderTasks();
+        updateDashboard();
+      });
+      
+      // Health metrics
+      healthRef.on('value', () => {
+        loadHealthMetrics();
+        if (document.getElementById('analytics-tab').classList.contains('active')) {
+          updateAnalyticsCharts();
+        }
+      });
+      
+      // Workouts
+      workoutsRef.on('value', () => {
+        loadWorkouts();
+        if (document.getElementById('analytics-tab').classList.contains('active')) {
+          updateAnalyticsCharts();
+        }
+      });
+      
+      // Habits
+      habitsRef.on('value', () => {
+        loadHabits();
+        updateDashboard();
+        if (document.getElementById('analytics-tab').classList.contains('active')) {
+          updateAnalyticsCharts();
+        }
+      });
+      
+      // Meals
+      mealsRef.on('value', () => {
+        loadMeals();
+      });
+      
+      // Contacts
+      contactsRef.on('value', () => {
+        loadContacts();
+      });
+      
+      // Passwords
+      passwordsRef.on('value', () => {
+        loadPasswords();
+      });
+      
+      // Goals
+      goalsRef.on('value', () => {
+        loadGoals();
+      });
+      
+      // Custom categories
+      customCategoriesRef.on('value', () => {
+        updateCategoryDropdowns();
+      });
+    }
 
     // Update all category dropdowns with custom categories
     function updateCategoryDropdowns() {
@@ -2246,7 +2326,6 @@
         document.getElementById('health-steps').value = '';
         document.getElementById('health-water').value = '';
         document.getElementById('health-sleep').value = '';
-        loadHealthMetrics();
       });
     }
 
@@ -2310,7 +2389,6 @@
         document.getElementById('workout-duration').value = '';
         document.getElementById('workout-type').value = '';
         document.getElementById('workout-notes').value = '';
-        loadWorkouts();
       });
     }
 
