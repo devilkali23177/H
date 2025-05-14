@@ -993,6 +993,67 @@
         </button>
       </div>
 
+      <!-- Edit Journal Entry Form (hidden by default) -->
+      <div id="edit-journal-container" class="card hidden">
+        <h2><i class="fas fa-edit"></i> Edit Entry</h2>
+        <input type="text" id="edit-title" placeholder="Entry Title">
+        <input type="date" id="edit-date">
+        <textarea id="edit-content" rows="5" placeholder="Write your thoughts..."></textarea>
+        <div class="filters">
+          <select id="edit-category">
+            <option value="">Select Category</option>
+            <option value="Bad Memories / Bad Past Events">Bad Memories / Bad Past Events</option>
+            <option value="History / Past Reflections">History / Past Reflections</option>
+            <option value="Achievements">Achievements</option>
+            <option value="Plans / Dreams">Plans / Dreams</option>
+            <option value="Implementation / Action Steps">Implementation / Action Steps</option>
+          </select>
+          <select id="edit-mood">
+            <option value="😊">😊 Happy</option>
+            <option value="😃">😃 Excited</option>
+            <option value="😄">😄 Joyful</option>
+            <option value="😁">😁 Grinning</option>
+            <option value="😆">😆 Laughing</option>
+            <option value="😐">😐 Neutral</option>
+            <option value="😑">😑 Expressionless</option>
+            <option value="😶">😶 Silent</option>
+            <option value="😏">😏 Smirking</option>
+            <option value="😕">😕 Confused</option>
+            <option value="😟">😟 Worried</option>
+            <option value="🙁">🙁 Slightly Sad</option>
+            <option value="😮">😮 Surprised</option>
+            <option value="😯">😯 Astonished</option>
+            <option value="😲">😲 Amazed</option>
+            <option value="😳">😳 Flushed</option>
+            <option value="😦">😦 Frowning</option>
+            <option value="😧">😧 Anguished</option>
+            <option value="😨">😨 Fearful</option>
+            <option value="😰">😰 Anxious</option>
+            <option value="😥">😥 Disappointed</option>
+            <option value="😢">😢 Sad</option>
+            <option value="😭">😭 Crying</option>
+            <option value="😱">😱 Screaming</option>
+            <option value="😖">😖 Confounded</option>
+            <option value="😣">😣 Persevering</option>
+            <option value="😞">😞 Disappointed</option>
+            <option value="😓">😓 Sweating</option>
+            <option value="😩">😩 Weary</option>
+            <option value="😫">😫 Tired</option>
+            <option value="😠">😠 Angry</option>
+            <option value="😡">😡 Pouting</option>
+          </select>
+        </div>
+        <input type="hidden" id="edit-entry-id">
+        <div class="btn-group">
+          <button onclick="updateJournalEntry()" class="success">
+            <i class="fas fa-save"></i> Update Entry
+          </button>
+          <button onclick="cancelEditJournal()" class="secondary">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+        </div>
+      </div>
+
       <div class="card">
         <h2><i class="fas fa-filter"></i> Filter Entries</h2>
         <div class="filters">
@@ -1526,7 +1587,7 @@
         }
       });
       
-      // Habits
+      // Habits - using on() for real-time updates
       habitsRef.on('value', () => {
         loadHabits();
         updateDashboard();
@@ -1550,7 +1611,7 @@
         loadPasswords();
       });
       
-      // Goals
+      // Goals - using on() for real-time updates
       goalsRef.on('value', () => {
         loadGoals();
       });
@@ -1565,6 +1626,7 @@
     function updateCategoryDropdowns() {
       updateDropdownWithCustomCategories('category');
       updateDropdownWithCustomCategories('filter-category');
+      updateDropdownWithCustomCategories('edit-category');
     }
 
     function updateDropdownWithCustomCategories(dropdownId) {
@@ -1952,6 +2014,44 @@
         document.getElementById('edit-journal-container').classList.remove('hidden');
         document.getElementById('edit-journal-container').scrollIntoView({ behavior: 'smooth' });
       });
+    }
+
+    async function updateJournalEntry() {
+      const id = document.getElementById('edit-entry-id').value;
+      const title = document.getElementById('edit-title').value;
+      const date = document.getElementById('edit-date').value;
+      const content = document.getElementById('edit-content').value;
+      const category = document.getElementById('edit-category').value;
+      const mood = document.getElementById('edit-mood').value;
+
+      if (!title || !date || !content || !category) {
+        alert("Please fill in all required fields.");
+        return;
+      }
+
+      try {
+        await journalRef.child(id).update({ 
+          title, 
+          date, 
+          content, 
+          category, 
+          mood,
+          timestamp: Date.now()
+        });
+        cancelEditJournal();
+      } catch (error) {
+        console.error("Error updating entry:", error);
+        alert("Failed to update entry. Please try again.");
+      }
+    }
+
+    function cancelEditJournal() {
+      document.getElementById('edit-journal-container').classList.add('hidden');
+      document.getElementById('edit-title').value = '';
+      document.getElementById('edit-content').value = '';
+      document.getElementById('edit-category').value = '';
+      document.getElementById('edit-mood').value = '😊';
+      document.getElementById('edit-entry-id').value = '';
     }
 
     async function deleteJournalEntry(id) {
@@ -2466,7 +2566,8 @@
       container.innerHTML = '';
 
       habitsRef.on('value', snapshot => {
-        if (!snapshot.val()) {
+        const data = snapshot.val();
+        if (!data) {
           container.innerHTML = `
             <div class="empty-state">
               <i class="fas fa-check-circle"></i>
@@ -2477,8 +2578,16 @@
           return;
         }
 
-        snapshot.forEach(child => {
-          const habit = child.val();
+        // Clear existing content
+        container.innerHTML = '';
+
+        // Convert to array and sort by creation date
+        const habits = Object.entries(data).map(([key, value]) => ({
+          id: key,
+          ...value
+        })).sort((a, b) => b.createdAt - a.createdAt);
+
+        habits.forEach(habit => {
           const div = document.createElement('div');
           div.className = 'habit-card';
           div.innerHTML = `
@@ -2487,10 +2596,10 @@
               Streak: ${habit.streak} days | Longest: ${habit.longestStreak} days
             </div>
             <div class="habit-actions">
-              <button onclick="completeHabit('${child.key}')" class="success">
+              <button onclick="completeHabit('${habit.id}')" class="success">
                 <i class="fas fa-check"></i> Complete
               </button>
-              <button onclick="deleteHabit('${child.key}')" class="danger">
+              <button onclick="deleteHabit('${habit.id}')" class="danger">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
@@ -2861,8 +2970,9 @@
       const container = document.getElementById('goals-list');
       container.innerHTML = '';
 
-      goalsRef.orderByChild('timestamp').once('value', snapshot => {
-        if (!snapshot.val()) {
+      goalsRef.on('value', snapshot => {
+        const data = snapshot.val();
+        if (!data) {
           container.innerHTML = `
             <div class="empty-state">
               <i class="fas fa-bullseye"></i>
@@ -2873,8 +2983,16 @@
           return;
         }
 
-        snapshot.forEach(child => {
-          const goal = child.val();
+        // Clear existing content
+        container.innerHTML = '';
+
+        // Convert to array and sort by creation date
+        const goals = Object.entries(data).map(([key, value]) => ({
+          id: key,
+          ...value
+        })).sort((a, b) => b.timestamp - a.timestamp);
+
+        goals.forEach(goal => {
           const progress = (goal.current / goal.target) * 100;
           
           const div = document.createElement('div');
@@ -2888,10 +3006,10 @@
             <p>${goal.current} / ${goal.target} ${goal.unit} (${Math.round(progress)}%)</p>
             <p><small>${goal.start} to ${goal.end}</small></p>
             <div class="entry-actions">
-              <button onclick="updateGoalProgress('${child.key}', ${goal.current + 1})" class="success">
+              <button onclick="updateGoalProgress('${goal.id}', ${goal.current + 1})" class="success">
                 <i class="fas fa-plus"></i> Add Progress
               </button>
-              <button onclick="deleteGoal('${child.key}')" class="danger">
+              <button onclick="deleteGoal('${goal.id}')" class="danger">
                 <i class="fas fa-trash"></i> Delete
               </button>
             </div>
@@ -3160,6 +3278,8 @@
     window.addCustomCategory = addCustomCategory;
     window.addJournalEntry = addJournalEntry;
     window.editJournalEntry = editJournalEntry;
+    window.updateJournalEntry = updateJournalEntry;
+    window.cancelEditJournal = cancelEditJournal;
     window.deleteJournalEntry = deleteJournalEntry;
     window.searchJournalEntries = searchJournalEntries;
     window.addFinanceEntry = addFinanceEntry;
