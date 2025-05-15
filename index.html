@@ -682,6 +682,7 @@
       border-radius: var(--radius);
       padding: 1rem;
       box-shadow: var(--shadow);
+      position: relative;
     }
 
     .meal-day h3 {
@@ -692,6 +693,19 @@
       margin-bottom: 0.5rem;
       padding-bottom: 0.5rem;
       border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+
+    .meal-actions {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+    }
+
+    .meal-actions button {
+      width: auto;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
     }
 
     /* Contacts Manager Styles */
@@ -2699,7 +2713,7 @@
         snapshot.forEach(child => {
           const meal = child.val();
           if (!mealsByDate[meal.date]) mealsByDate[meal.date] = [];
-          mealsByDate[meal.date].push(meal);
+          mealsByDate[meal.date].push({ id: child.key, ...meal });
         });
 
         // Sort dates
@@ -2724,6 +2738,11 @@
               <strong>${meal.type.charAt(0).toUpperCase() + meal.type.slice(1)}:</strong> 
               ${meal.name} ${meal.calories ? `(${meal.calories} cal)` : ''}
               <div><small>${meal.ingredients}</small></div>
+              <div class="meal-actions">
+                <button onclick="deleteMeal('${meal.id}')" class="danger">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
             `;
             dayDiv.appendChild(mealDiv);
           });
@@ -2731,6 +2750,12 @@
           container.appendChild(dayDiv);
         });
       });
+    }
+
+    function deleteMeal(key) {
+      if (confirm("Are you sure you want to delete this meal?")) {
+        mealsRef.child(key).remove();
+      }
     }
 
     // Contact Functions
@@ -3293,6 +3318,7 @@
     window.completeHabit = completeHabit;
     window.deleteHabit = deleteHabit;
     window.addMeal = addMeal;
+    window.deleteMeal = deleteMeal;
     window.addContact = addContact;
     window.deleteContact = deleteContact;
     window.generatePassword = generatePassword;
